@@ -10,13 +10,11 @@ module CacheTree
 
     include Singleton
 
+    attr_accessor :configuration
+
     def initialize
       @current_link   = nil
       @configuration  = { :perform_caching => true }
-    end
-
-    def configure(options)
-      @configuration.merge(options)
     end
 
     def use(cache_link)
