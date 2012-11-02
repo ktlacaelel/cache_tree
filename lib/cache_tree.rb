@@ -6,6 +6,14 @@ require 'tree_node'
 
 module CacheTree
 
+  def self.use(node, report = proc {}, &block)
+    CacheTree::Manager.instance.use(node, report, &block)
+  end
+
+  def self.node(object)
+    CacheTree::Node.new(object)
+  end
+
   class Manager
 
     include Singleton
@@ -17,31 +25,33 @@ module CacheTree
       @configuration  = { :perform_caching => true }
     end
 
-    def use(cache_link)
-      @current_link = cache_link
+    def use(node, report, &block)
+      return yield unless @configuration[:perform_caching]
+      @node = node
+      @node.map(:up) { |parent| parent.load! }
+      return read if exists?
+      report.call
+      save(yield)
     end
+
+    protected
 
     def exists?
       return false unless @configuration[:perform_caching]
-      btree_key_files = @current_link.map(:up) { |node| node.btree_key }
+      btree_key_files = @node.map(:up) { |node| node.btree_key }
       return false unless btree_key_files.all? { |btree_key| File.exists?(btree_key) }
-      @current_link.map(:up) { |node| node.load_btree_key }
-      File.exists?(@current_link.cache_file)
-    end
-
-    def expire!
-      @current_link.expire
+      File.exists?(@node.cache_file)
     end
 
     def read
-      @current_link.map(:up) { |node| node.load_btree_key }
-      File.read(@current_link.cache_file)
+      File.read(@node.cache_file)
     end
 
     def save(data)
-      @current_link.map(:up) { |node| node.save }
-      FileUtils.mkdir_p(File.dirname(@current_link.cache_file))
-      File.open(@current_link.cache_file, 'w+') { |file| file.write data }
+      @node.map(:up) { |node| node.save }
+      FileUtils.mkdir_p(File.dirname(@node.cache_file))
+      File.open(@node.cache_file, 'w+') { |file| file.write data }
+      data
     end
 
   end
@@ -83,8 +93,14 @@ module CacheTree
     end
 
     # Updates current node stamp from btree_key
-    def load_btree_key
+    def load
       @stamp = eval(File.read(btree_key))
+    end
+
+    # Updates current node stamp from btree_key
+    # ensuring the btree file is present reflecting node-data on memory.
+    def load!
+      File.exists?(btree_key) ? load : save
     end
 
     # Sums up all stamps and generates a checksum.
@@ -126,11 +142,11 @@ module CacheTree
     # @return [Hash] with detailed diagnosis of curret status for that
     # node's cache
     def diagnose
+      map(:up) { |node| node.load! }
       file_alive             = cache_file
       base                   = File.basename(file_alive)
       dir                    = File.dirname(file_alive)
       diagnostic             = {}
-      diagnostic[:btree_key] = btree_key
       diagnostic[:alive]     = file_alive
       diagnostic[:dead]      = []
       Dir["#{dir}/*.cache"].each do |cached_file|
@@ -142,10 +158,16 @@ module CacheTree
 
     # Prints out active cache in green, and expired files in red.
     def debug
-      puts cache_file.to_ansi.green
-      diagnose[:dead].each { |file| puts file.to_ansi.red }
+      diagnostic = diagnose
+      if File.exists?(diagnostic[:alive])
+        puts diagnostic[:alive].to_ansi.green
+      else
+        puts diagnostic[:alive].to_ansi.yellow
+      end
+      diagnostic[:dead].each { |file| puts file.to_ansi.red }
       nil
     end
+
 
   end
 
