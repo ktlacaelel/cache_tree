@@ -4,12 +4,12 @@ The idea behind this, is to be able to manage very large ammounts of cache files
 and expire millions of cache files in just a few microseconds.
 
 Instead of performing some ActiveRecord#touch and have it creating a massive sequence
-of queries bouncing off to eliminate a group of items from the cache
+of queries bouncing off going up/down the herarchies to eliminate a group of items from the cache
 
 CacheTree stores cache in trees, actually it borrows the btree strategy to fetch
 and quickly determine where cache files are.
 
-you can always add new subtrees or create new trees and handle the cache at different leves.
+you can always add new subtrees or create new trees and handle the cache at different levels.
 no matter where you are cache expiring is superfast.
 
 While the actual deletion of the expired cache files is also fast. it is recomended to do so
