@@ -1,4 +1,4 @@
-= cache_tree
+= CacheTree
 
 The idea behind this, is to be able to manage very large ammounts of cache files.
 and expire millions of cache files in just a few microseconds.
