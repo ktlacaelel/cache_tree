@@ -69,9 +69,22 @@ module CacheTree
     include Tree::Node
 
     def initialize(target)
+      if target.is_a?(Hash)
+        initialize_from_hash(target)
+      else
+        initialize_from_object(target)
+      end
+      @stamp = generate_stamp
+    end
+
+    def initialize_from_hash(hash)
+      @name  = hash[:name]
+      @value = hash[:value]
+    end
+
+    def initialize_from_object(target)
       @name  = target.class.name.gsub(/([A-Z])/) { "_#{$1}" }.gsub(/^./, '').downcase
       @value = target.id
-      @stamp = generate_stamp
     end
 
     def directory
