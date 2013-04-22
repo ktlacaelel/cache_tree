@@ -107,7 +107,7 @@ module CacheTree
 
     # Updates current node stamp from btree_key
     def load
-      @stamp = eval(File.read(btree_key))
+      @stamp = eval(File.read(btree_key).to_s.inspect)
     end
 
     # Updates current node stamp from btree_key
