@@ -17,24 +17,150 @@ in some sort of background job solution.
 
 Trees are cool :)
 
-== Contributing to cache_tree
+== Simple example.
 
     require 'rubygems'
     require 'cache_tree'
 
-    class Record
-      def id
-        1
+    # Setup
+    CacheTree::Node.directory = 'cache/tree'
+
+    # Create a cache node in the tree
+    node = CacheTree.node({:name => 'node', :value => 1})
+
+    # Store data into cache!
+    puts CacheTree.use(node) { 'This is my complex operation!' }
+
+    # Pull data from the cache, if exists in cache and all that is
+    # handled internally!
+    puts CacheTree.use(node) { 'Even if this changes cached data will be returned' }
+
+    # Expiring!
+    node.expire
+
+    # Removing expired files!
+    node.clean
+
+== Connecting nodes example.
+
+    require 'rubygems'
+    require 'cache_tree'
+
+    # Setup
+    CacheTree::Node.directory = 'cache/tree'
+
+    # Create/Handle two separated cache trees.
+    parent_1 = CacheTree.node({:name => 'parent_1', :value => 1})
+    parent_2 = CacheTree.node({:name => 'parent_2', :value => 2})
+
+    # Each tree has sub-nodes.
+    child_1 = CacheTree.node({:name => 'child_1', :value => 1})
+    child_2 = CacheTree.node({:name => 'child_2', :value => 2})
+    child_3 = CacheTree.node({:name => 'child_3', :value => 3})
+
+    # Create a cache tree relationship between the nodes.
+    parent_1.add_child(child_1)
+    parent_2.add_child(child_2)
+    parent_1.add_child(child_3)
+
+    puts CacheTree.use(child_1) { 'This is child 1 cache' }
+    puts CacheTree.use(child_2) { 'This is child 2 cache' }
+    puts CacheTree.use(child_3) { 'This is child 3 cache' }
+
+    # Expire cache for all nodes below parent 1.
+    parent_1.expire
+
+    # parent 2 cache is still active at this point, parent 1 cache needs to be regenerated.
+
+    # remove expired files from child nodes (1, 3)
+    child_1.clean
+    child_3.clean
+
+== Example Output
+
+    bash-3.2$ ruby cache_tree.usage_example.rb
+    This is child 1 cache
+    This is child 2 cache
+    This is child 3 cache
+    bash-3.2$ tree cache
+    cache
+    `-- tree
+        |-- parent_1
+        |   `-- 1
+        |       |-- btree.key
+        |       |-- child_1
+        |       |   `-- 1
+        |       |       `-- btree.key
+        |       `-- child_3
+        |           `-- 3
+        |               `-- btree.key
+        `-- parent_2
+            `-- 2
+                |-- btree.key
+                `-- child_2
+                    `-- 2
+                        |-- btree.key
+                        `-- c1533963ef2c86a1f8c80cde871d0b09.cache
+
+    11 directories, 6 files
+    bash-3.2$ cat cache/tree/parent_2/2/child_2/2/c1533963ef2c86a1f8c80cde871d0b09.cache
+    This is child 2 cache
+
+== Complex example.
+
+    require 'rubygems'
+    require 'cache_tree'
+
+    # Mocks
+    class ActiveRecordMock
+      attr_accessor :id
+      def initialize
+        @id = 1
       end
     end
 
-    CacheTree::Node.directory = 'cache_tree'
-    record = CacheTree::Node.new(Record.new)
-    CacheTree::Manager.instance.use(record)
-    unless CacheTree::Manager.instance.exists?
-      CacheTree::Manager.instance.save('data')
-    end
-    puts CacheTree::Manager.instance.read
+    class User    < ActiveRecordMock; end
+    class Post    < ActiveRecordMock; end
+    class Comment < ActiveRecordMock; end
+    class Like    < ActiveRecordMock; end
+
+    # Easily Setup complex cached trees.
+    user    = CacheTree.node(User.new)
+    post    = CacheTree.node(Post.new)
+    comment = CacheTree.node(Comment.new)
+    like    = CacheTree.node(Like.new)
+
+    user.add_child(post)
+    post.add_child(comment)
+    comment.add_child(like)
+
+    # Setup
+    CacheTree::Node.directory = 'cache/tree'
+
+    # Example Usage.
+    # - first time block gets executed
+    # - second time will be pulled out from cache!
+    # - you can grab any of the nodes and expire all the cache below that
+    #   node
+    puts CacheTree.use(like) { 'Generating cache' }
+
+    # Expire all cache below post with id 1 but leave user cache alone.
+    post.expire
+
+    puts CacheTree.use(like) { 'Generating new cache' }
+    puts CacheTree.use(like) { 'xxxxxxxxxxxxxxxxxxxx' } # => will output 'Generating new cache'
+
+    # you can debug any node to figure out what is going on with the cache
+    # at that particular point.
+    # - when debugging, the actual cache file will be shown in green
+    #   (active cache)
+    # - all dead cache will be shown in red
+    # - if cache file has not been generated it would be printed in yellow!
+    like.debug
+
+    # Use this to remove expired cache files.
+    like.clean
+
 
 == Copyright
 
