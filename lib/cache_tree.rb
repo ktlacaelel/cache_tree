@@ -1,8 +1,13 @@
-require 'md5'
 require 'singleton'
 require 'fileutils'
 require 'isna'
 require 'tree_node'
+
+if RUBY_VERSION == "1.8.7"
+  require 'md5'
+else
+  require 'digest/md5'
+end
 
 module CacheTree
 
@@ -107,7 +112,7 @@ module CacheTree
 
     # Updates current node stamp from btree_key
     def load
-      @stamp = eval(File.read(btree_key).to_s.inspect)
+      @stamp = File.read(btree_key).to_s
     end
 
     # Updates current node stamp from btree_key
@@ -116,9 +121,17 @@ module CacheTree
       File.exists?(btree_key) ? load : save
     end
 
+    def _md5_
+      if RUBY_VERSION == "1.8.7"
+        MD5
+      else
+        Digest::MD5
+      end
+    end
+
     # Sums up all stamps and generates a checksum.
     def checksum
-      MD5.hexdigest(map(:up) { |node| node.stamp } * '')
+      _md5_.hexdigest(map(:up) { |node| node.stamp } * '')
     end
 
     # Resolves final name for cache file.
@@ -129,7 +142,7 @@ module CacheTree
     # Writes node stamp from to btree_key file
     def save
       FileUtils.mkdir_p File.dirname(btree_key)
-      File.open(btree_key, 'w+') { |file| file.write stamp.inspect }
+      File.open(btree_key, 'w+') { |file| file.write stamp }
     end
 
     # Quickly expire a whole cache-tree or a single node.
@@ -169,15 +182,22 @@ module CacheTree
       diagnostic
     end
 
-    # Prints out active cache in green, and expired files in red.
+    # Prints out debugging information about this node.
+    #
+    # Current cache file that exists in green
+    # Current cache file that is supposed to exist in yellow.
+    # All expired cache files are shown shown in red.
     def debug
       diagnostic = diagnose
+      template = "%-5s %5s %s"
       if File.exists?(diagnostic[:alive])
-        puts diagnostic[:alive].to_ansi.green
+        puts template % ['+', 'current', diagnostic[:alive].to_ansi.green]
       else
-        puts diagnostic[:alive].to_ansi.yellow
+        puts template % ['-', 'missing', diagnostic[:alive].to_ansi.yellow]
       end
-      diagnostic[:dead].each { |file| puts file.to_ansi.red }
+      diagnostic[:dead].each_with_index do |file, index|
+        puts template % [index + 1, 'expired', file.to_ansi.red]
+      end
       nil
     end
 
